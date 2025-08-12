@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>封印解放の儀 - 15パズル</title>
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
+<style>
+    body {
+        background: radial-gradient(circle at center, #1a001a, #000);
+        font-family: 'Cinzel', serif;
+        color: #fff;
+        text-align: center;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    h1 {
+        font-size: 28px;
+        margin: 20px 0;
+        text-shadow: 0 0 10px purple, 0 0 20px violet;
+    }
+
+    #puzzle {
+        display: grid;
+        grid-template-columns: repeat(4, 80px);
+        grid-template-rows: repeat(4, 80px);
+        gap: 4px;
+        margin: 20px auto;
+        width: fit-content;
+        border: 4px solid purple;
+        box-shadow: 0 0 20px purple;
+        transition: opacity 1s ease;
+    }
+
+    .tile {
+        background: linear-gradient(135deg, rgba(80,0,80,0.9), rgba(40,0,40,0.9));
+        border: 2px solid #8000ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        text-shadow: 0 0 5px white;
+        font-family: 'UnifrakturCook', cursive;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .tile:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 15px violet;
+    }
+
+    .empty {
+        background: rgba(0, 0, 0, 0.3);
+        border: 2px dashed #400040;
+    }
+
+    /* 勝利後のボタン */
+    #restart-btn {
+        display: none;
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 18px;
+        font-family: 'UnifrakturCook', cursive;
+        background: linear-gradient(135deg, #4b0082, #800080);
+        border: 2px solid #c0a0ff;
+        color: white;
+        cursor: pointer;
+        text-shadow: 0 0 5px #fff;
+        box-shadow: 0 0 10px purple;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    #restart-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 20px violet;
+    }
+
+    /* フラッシュ用オーバーレイ */
+    #flash {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(180,0,255,0.6));
+        opacity: 0;
+        pointer-events: none;
+        animation: none;
+        z-index: 999;
+    }
+    @keyframes flashAnim {
+        0%   { opacity: 0; }
+        20%  { opacity: 1; }
+        60%  { opacity: 0.6; }
+        100% { opacity: 0; }
+    }
+
+    /* 紫の残光 */
+    #afterglow {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(180, 0, 255, 0.25);
+        opacity: 0;
+        pointer-events: none;
+        z-index: 998;
+    }
+    @keyframes afterglowAnim {
+        0%   { opacity: 0.25; }
+        100% { opacity: 0; }
+    }
+</style>
+</head>
+<body>
+
+<h1>封印解放の儀</h1>
+<div id="puzzle"></div>
+<p id="message"></p>
+<button id="restart-btn">再び封印を解く</button>
+<div id="flash"></div>
+<div id="afterglow"></div>
+
+<audio id="organ-sound" src="organ.mp3" preload="auto"></audio>
+
+<script>
+const puzzleContainer = document.getElementById('puzzle');
+const flash = document.getElementById('flash');
+const afterglow = document.getElementById('afterglow');
+const organSound = document.getElementById('organ-sound');
+const restartBtn = document.getElementById('restart-btn');
+
+let tiles = [];
+let emptyIndex = 15;
+
+function initPuzzle() {
+    do {
+        tiles = [...Array(15).keys()].map(n => n + 1);
+        tiles.push(null);
+        shuffle(tiles);
+    } while (!isSolvable(tiles));
+
+    puzzleContainer.style.opacity = 1;
+    document.getElementById('message').textContent = '';
+    restartBtn.style.display = 'none';
+    drawPuzzle();
+}
+
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+function isSolvable(puzzle) {
+    const oneD = puzzle.filter(n => n !== null);
+    let inversions = 0;
+    for (let i = 0; i < oneD.length; i++) {
+        for (let j = i + 1; j < oneD.length; j++) {
+            if (oneD[i] > oneD[j]) inversions++;
+        }
+    }
+    const emptyRowFromBottom = 4 - Math.floor(puzzle.indexOf(null) / 4);
+    if (emptyRowFromBottom % 2 === 0) {
+        return inversions % 2 === 1;
+    } else {
+        return inversions % 2 === 0;
+    }
+}
+
+function drawPuzzle() {
+    puzzleContainer.innerHTML = '';
+    tiles.forEach((num, index) => {
+        const tile = document.createElement('div');
+        if (num) {
+            tile.classList.add('tile');
+            tile.textContent = num;
+            tile.addEventListener('click', () => moveTile(index));
+        } else {
+            tile.classList.add('empty');
+            emptyIndex = index;
+        }
+        puzzleContainer.appendChild(tile);
+    });
+}
+
+function moveTile(index) {
+    const validMoves = [
+        emptyIndex - 1, emptyIndex + 1,
+        emptyIndex - 4, emptyIndex + 4
+    ];
+    if (validMoves.includes(index) &&
+        !(index % 4 === 3 && emptyIndex % 4 === 0) &&
+        !(index % 4 === 0 && emptyIndex % 4 === 3)) {
+        
+        [tiles[emptyIndex], tiles[index]] = [tiles[index], tiles[emptyIndex]];
+        drawPuzzle();
+        checkWin();
+    }
+}
+
+function checkWin() {
+    if (tiles.slice(0, 15).every((val, i) => val === i + 1)) {
+        document.getElementById('message').innerHTML =
+            "<span style='color:violet; text-shadow:0 0 10px purple; font-size:24px;'>封印は解かれた…</span>";
+        
+        flash.style.animation = 'flashAnim 2.5s forwards';
+        setTimeout(() => {
+            afterglow.style.animation = 'afterglowAnim 2s forwards';
+        }, 2500);
+        setTimeout(() => {
+            puzzleContainer.style.opacity = 0;
+        }, 500);
+
+        organSound.currentTime = 0;
+        organSound.play();
+
+        // 勝利後にボタン表示
+        setTimeout(() => {
+            restartBtn.style.display = 'inline-block';
+        }, 3000);
+    }
+}
+
+// 再び封印を解くボタン
+restartBtn.addEventListener('click', () => {
+    initPuzzle();
+});
+
+initPuzzle();
+</script>
+
+</body>
+</html>
